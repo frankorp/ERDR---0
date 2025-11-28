@@ -1,156 +1,369 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ЄРДР PRO - Об'єднана система</title>
+    <style>
+        :root {
+            --primary: #1e40af;
+            --primary-dark: #1e3a8a;
+            --secondary: #64748b;
+            --success: #059669;
+            --warning: #d97706;
+            --danger: #dc2626;
+            --dark: #1f2937;
+            --light: #f8fafc;
+            --gray: #6b7280;
+            --gunp: #1e40af;
+            --sbu: #dc2626;
+            --prosecutor: #7c2d12;
+            --admin: #7e22ce;
+        }
 
-{% block content %}
-<div class="container">
-    <div class="header">
-        <div class="logo">🛡️ ЄРДР PRO</div>
-        <div class="subtitle">Об'єднана система ведення справ правоохоронних органів</div>
-    </div>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    <div class="agencies-grid">
-        <div class="agency-card" onclick="selectAgency('gunp')" style="border-color: var(--gunp);">
-            <div class="agency-icon" style="background: var(--gunp);">👮‍♂️</div>
-            <div class="agency-name">ГУНП</div>
-            <div class="agency-desc">Головне управління Національної поліції</div>
-            <button class="btn" style="background: var(--gunp);">Увійти в систему</button>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: var(--dark);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: white;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 1.2rem;
+        }
+
+        .agencies-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .agency-card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+            border: 3px solid transparent;
+        }
+
+        .agency-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .agency-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 15px;
+            color: white;
+        }
+
+        .agency-name {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .agency-desc {
+            color: var(--gray);
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            background: var(--success);
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            display: none;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+
+        .password-wrapper {
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+    <div class="notification" id="notification"></div>
+
+    <div class="container">
+        <div class="header">
+            <div class="logo">🛡️ ЄРДР PRO</div>
+            <div class="subtitle">Об'єднана система ведення справ правоохоронних органів</div>
         </div>
 
-        <div class="agency-card" onclick="selectAgency('sbu')" style="border-color: var(--sbu);">
-            <div class="agency-icon" style="background: var(--sbu);">🕵️‍♂️</div>
-            <div class="agency-name">СБУ</div>
-            <div class="agency-desc">Служба Безпеки України</div>
-            <button class="btn" style="background: var(--sbu);">Увійти в систему</button>
-        </div>
+        <div class="agencies-grid">
+            <div class="agency-card" onclick="selectAgency('gunp')" style="border-color: var(--gunp);">
+                <div class="agency-icon" style="background: var(--gunp);">👮‍♂️</div>
+                <div class="agency-name">ГУНП</div>
+                <div class="agency-desc">Головне управління Національної поліції</div>
+                <button class="btn" style="background: var(--gunp);">Увійти в систему</button>
+            </div>
 
-        <div class="agency-card" onclick="selectAgency('prosecutor')" style="border-color: var(--prosecutor);">
-            <div class="agency-icon" style="background: var(--prosecutor);">⚖️</div>
-            <div class="agency-name">Прокуратура</div>
-            <div class="agency-desc">Генеральна прокуратура України</div>
-            <button class="btn" style="background: var(--prosecutor);">Увійти в систему</button>
-        </div>
+            <div class="agency-card" onclick="selectAgency('sbu')" style="border-color: var(--sbu);">
+                <div class="agency-icon" style="background: var(--sbu);">🕵️‍♂️</div>
+                <div class="agency-name">СБУ</div>
+                <div class="agency-desc">Служба Безпеки України</div>
+                <button class="btn" style="background: var(--sbu);">Увійти в систему</button>
+            </div>
 
-        <div class="agency-card" onclick="selectAgency('admin')" style="border-color: var(--admin);">
-            <div class="agency-icon" style="background: var(--admin);">👨‍💼</div>
-            <div class="agency-name">Адмін-панель</div>
-            <div class="agency-desc">Панель адміністратора системи</div>
-            <button class="btn" style="background: var(--admin);">Увійти в систему</button>
-        </div>
-    </div>
-</div>
+            <div class="agency-card" onclick="selectAgency('prosecutor')" style="border-color: var(--prosecutor);">
+                <div class="agency-icon" style="background: var(--prosecutor);">⚖️</div>
+                <div class="agency-name">Прокуратура</div>
+                <div class="agency-desc">Генеральна прокуратура України</div>
+                <button class="btn" style="background: var(--prosecutor);">Увійти в систему</button>
+            </div>
 
-<!-- Модальное окно входа -->
-<div class="modal" id="loginModal">
-    <div class="modal-content">
-        <h2 id="modal-agency-name">ГУНП</h2>
-        <p id="modal-agency-desc">Вхід до системи ГУНП</p>
-        
-        <div class="form-group">
-            <label for="loginUsername">Логін:</label>
-            <input type="text" id="loginUsername" class="form-control" placeholder="Введіть логін">
-        </div>
-        
-        <div class="form-group">
-            <label for="loginPassword">Пароль:</label>
-            <div class="password-wrapper">
-                <input type="password" id="loginPassword" class="form-control" placeholder="Введіть пароль">
-                <button type="button" class="password-toggle" onclick="togglePassword()">👁️</button>
+            <div class="agency-card" onclick="selectAgency('admin')" style="border-color: var(--admin);">
+                <div class="agency-icon" style="background: var(--admin);">👨‍💼</div>
+                <div class="agency-name">Адмін-панель</div>
+                <div class="agency-desc">Панель адміністратора системи</div>
+                <button class="btn" style="background: var(--admin);">Увійти в систему</button>
             </div>
         </div>
-        
-        <button class="btn" onclick="login()" style="width: 100%; margin-bottom: 15px;">Увійти</button>
-        <button class="btn" onclick="closeLoginModal()" style="width: 100%; background: var(--gray);">Скасувати</button>
-        
-        <div style="margin-top: 20px; padding: 15px; background: #f3f4f6; border-radius: 8px;">
-            <h4>Тестові паролі:</h4>
-            <div id="passwordList"></div>
+    </div>
+
+    <!-- Модальное окно входа -->
+    <div class="modal" id="loginModal">
+        <div class="modal-content">
+            <h2 id="modal-agency-name">ГУНП</h2>
+            <p id="modal-agency-desc">Вхід до системи ГУНП</p>
+            
+            <div class="form-group">
+                <label for="loginUsername">Логін:</label>
+                <input type="text" id="loginUsername" class="form-control" placeholder="Введіть логін">
+            </div>
+            
+            <div class="form-group">
+                <label for="loginPassword">Пароль:</label>
+                <div class="password-wrapper">
+                    <input type="password" id="loginPassword" class="form-control" placeholder="Введіть пароль">
+                    <button type="button" class="password-toggle" onclick="togglePassword()">👁️</button>
+                </div>
+            </div>
+            
+            <button class="btn" onclick="login()" style="width: 100%; margin-bottom: 15px;">Увійти</button>
+            <button class="btn" onclick="closeLoginModal()" style="width: 100%; background: var(--gray);">Скасувати</button>
+            
+            <div style="margin-top: 20px; padding: 15px; background: #f3f4f6; border-radius: 8px;">
+                <h4>Тестові паролі:</h4>
+                <div id="passwordList"></div>
+            </div>
         </div>
     </div>
-</div>
 
-<script>
-let currentAgency = null;
+    <script>
+        let currentAgency = null;
 
-function selectAgency(agency) {
-    currentAgency = agency;
-    
-    fetch(`/select_agency/${agency}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                document.getElementById('modal-agency-name').textContent = data.agency.fullName;
-                document.getElementById('modal-agency-desc').textContent = `Вхід до системи ${data.agency.name}`;
-                
-                // Показываем пароли
-                const passwordList = document.getElementById('passwordList');
-                passwordList.innerHTML = data.users.map(user => `
-                    <div style="margin: 5px 0; padding: 5px; background: white; border-radius: 4px;">
-                        <strong>${user.username}</strong>: ${user.password}
-                    </div>
-                `).join('');
-                
-                document.getElementById('loginModal').style.display = 'flex';
+        function selectAgency(agency) {
+            currentAgency = agency;
+            
+            fetch(`/select_agency/${agency}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('modal-agency-name').textContent = data.agency.fullName;
+                        document.getElementById('modal-agency-desc').textContent = `Вхід до системи ${data.agency.name}`;
+                        
+                        // Показываем пароли
+                        const passwordList = document.getElementById('passwordList');
+                        passwordList.innerHTML = data.users.map(user => `
+                            <div style="margin: 5px 0; padding: 5px; background: white; border-radius: 4px;">
+                                <strong>${user.username}</strong>: ${user.password}
+                            </div>
+                        `).join('');
+                        
+                        document.getElementById('loginModal').style.display = 'flex';
+                    }
+                });
+        }
+
+        function closeLoginModal() {
+            document.getElementById('loginModal').style.display = 'none';
+        }
+
+        function togglePassword() {
+            const passwordInput = document.getElementById('loginPassword');
+            const toggleButton = document.querySelector('.password-toggle');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleButton.textContent = '🔒';
+            } else {
+                passwordInput.type = 'password';
+                toggleButton.textContent = '👁️';
+            }
+        }
+
+        function login() {
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            fetch('/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    username: username,
+                    password: password,
+                    agency: currentAgency
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message, 'success');
+                    setTimeout(() => {
+                        window.location.href = '/dashboard';
+                    }, 1000);
+                } else {
+                    showNotification(data.message, 'error');
+                }
+            });
+        }
+
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.style.background = type === 'success' ? 'var(--success)' : 'var(--danger)';
+            notification.style.display = 'block';
+            
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 3000);
+        }
+
+        // Закрытие модального окна при клике вне его
+        window.onclick = function(event) {
+            const modal = document.getElementById('loginModal');
+            if (event.target === modal) {
+                closeLoginModal();
+            }
+        }
+
+        // Enter для входа
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && document.getElementById('loginModal').style.display === 'flex') {
+                login();
             }
         });
-}
-
-function closeLoginModal() {
-    document.getElementById('loginModal').style.display = 'none';
-}
-
-function togglePassword() {
-    const passwordInput = document.getElementById('loginPassword');
-    const toggleButton = document.querySelector('.password-toggle');
-    
-    if (passwordInput.type === 'password') {
-        passwordInput.type = 'text';
-        toggleButton.textContent = '🔒';
-    } else {
-        passwordInput.type = 'password';
-        toggleButton.textContent = '👁️';
-    }
-}
-
-function login() {
-    const username = document.getElementById('loginUsername').value;
-    const password = document.getElementById('loginPassword').value;
-    
-    fetch('/login', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            username: username,
-            password: password,
-            agency: currentAgency
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showNotification(data.message, 'success');
-            setTimeout(() => {
-                window.location.href = '/dashboard';
-            }, 1000);
-        } else {
-            showNotification(data.message, 'error');
-        }
-    });
-}
-
-// Закрытие модального окна при клике вне его
-window.onclick = function(event) {
-    const modal = document.getElementById('loginModal');
-    if (event.target === modal) {
-        closeLoginModal();
-    }
-}
-
-// Enter для входа
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' && document.getElementById('loginModal').style.display === 'flex') {
-        login();
-    }
-});
-</script>
-{% endblock %}
+    </script>
+</body>
+</html>

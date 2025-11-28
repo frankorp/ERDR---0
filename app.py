@@ -1,12 +1,13 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash
-import json
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 import datetime
 import random
+import json
 import os
 from functools import wraps
 
 app = Flask(__name__)
 app.secret_key = 'ERDR_PRO_SECRET_KEY_2024'
+app.template_folder = 'templates'
 
 # 🔐 24 АБСОЛЮТНО РІЗНИХ ПАРОЛЯ
 USERS = {
@@ -52,83 +53,10 @@ CASES_DATABASE = {
     "prosecutor": []
 }
 
-# 🔥 СИСТЕМА ЛОГИРОВАНИЯ
-SYSTEM_LOGS = {
-    "logs": [],
-    "securityAlerts": []
-}
-
-# Типы логов
-LOG_TYPES = {
-    "LOGIN": "login",
-    "LOGOUT": "logout", 
-    "CREATE_CASE": "create",
-    "DELETE_CASE": "delete",
-    "VIEW_CASE": "view",
-    "EXPORT_DATA": "export",
-    "SYSTEM": "system"
-}
-
-# Декоратор для проверки авторизации
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'user' not in session:
-            return redirect(url_for('index'))
-        return f(*args, **kwargs)
-    return decorated_function
-
-def generate_random_ip():
-    return f"192.168.{random.randint(1, 255)}.{random.randint(1, 255)}"
-
-def log_action(log_type, action, details=None, user=None, agency=None):
-    if details is None:
-        details = {}
-    
-    log_entry = {
-        "id": str(datetime.datetime.now().timestamp()) + str(random.random()),
-        "timestamp": datetime.datetime.now().isoformat(),
-        "type": log_type,
-        "action": action,
-        "details": details,
-        "user": user["name"] if user else "Система",
-        "username": user["username"] if user else "system",
-        "agency": agency or session.get('agency', 'system'),
-        "ip": generate_random_ip(),
-        "user_agent": request.headers.get('User-Agent', 'Unknown')
-    }
-    
-    SYSTEM_LOGS["logs"].insert(0, log_entry)
-    
-    # Сохраняем только последние 1000 логов
-    if len(SYSTEM_LOGS["logs"]) > 1000:
-        SYSTEM_LOGS["logs"] = SYSTEM_LOGS["logs"][:1000]
-    
-    return log_entry
-
-def get_agency_data(agency):
-    agencies = {
-        "gunp": {"name": "ГУНП", "fullName": "Головне управління Національної поліції", "color": "#1e40af", "icon": "👮‍♂️"},
-        "sbu": {"name": "СБУ", "fullName": "Служба Безпеки України", "color": "#dc2626", "icon": "🕵️‍♂️"},
-        "prosecutor": {"name": "Прокуратура", "fullName": "Генеральна прокуратура України", "color": "#7c2d12", "icon": "⚖️"},
-        "admin": {"name": "Адмін-панель", "fullName": "Панель адміністратора системи", "color": "#7e22ce", "icon": "👨‍💼"}
-    }
-    return agencies.get(agency, {})
-
-def get_status_text(status):
-    statuses = {
-        "new": "Нова",
-        "in-progress": "В роботі", 
-        "completed": "Завершена",
-        "closed": "Закрита"
-    }
-    return statuses.get(status, status)
+# СИСТЕМА ЛОГИРОВАНИЯ
+SYSTEM_LOGS = []
 
 def initialize_test_data():
-    # Очищаем базу данных перед инициализацией
-    for agency in CASES_DATABASE:
-        CASES_DATABASE[agency] = []
-    
     CASES_DATABASE["gunp"].append({
         "id": 1,
         "number": "210/2024",
@@ -177,13 +105,17 @@ def index():
 
 @app.route('/select_agency/<agency>')
 def select_agency(agency):
-    session['selected_agency'] = agency
-    agency_data = get_agency_data(agency)
-    users = USERS.get(agency, [])
+    agencies = {
+        "gunp": {"name": "ГУНП", "fullName": "Головне управління Національної поліції", "color": "#1e40af", "icon": "👮‍♂️"},
+        "sbu": {"name": "СБУ", "fullName": "Служба Безпеки України", "color": "#dc2626", "icon": "🕵️‍♂️"},
+        "prosecutor": {"name": "Прокуратура", "fullName": "Генеральна прокуратура України", "color": "#7c2d12", "icon": "⚖️"},
+        "admin": {"name": "Адмін-панель", "fullName": "Панель адміністратора системи", "color": "#7e22ce", "icon": "👨‍💼"}
+    }
+    
     return jsonify({
         "success": True,
-        "agency": agency_data,
-        "users": users
+        "agency": agencies.get(agency),
+        "users": USERS.get(agency, [])
     })
 
 @app.route('/login', methods=['POST'])
@@ -192,9 +124,6 @@ def login():
     username = data.get('username')
     password = data.get('password')
     agency = data.get('agency')
-    
-    if not username or not password:
-        return jsonify({"success": False, "message": "Будь ласка, заповніть всі поля!"})
     
     user = None
     for u in USERS.get(agency, []):
@@ -207,38 +136,19 @@ def login():
         session['agency'] = agency
         session['logged_in'] = True
         
-        log_action(LOG_TYPES["LOGIN"], "Успішний вхід в систему", {
-            "username": username,
-            "status": "success",
-            "agency": agency
-        }, user)
-        
         return jsonify({
             "success": True,
             "message": f"Вітаємо, {user['name']}!",
             "user": user
         })
     else:
-        log_action(LOG_TYPES["LOGIN"], "Невдала спроба входу", {
-            "username": username,
-            "status": "failed",
-            "agency": agency
-        })
-        
         return jsonify({"success": False, "message": "Невірний логін або пароль!"})
 
-@app.route('/logout')
-def logout():
-    if 'user' in session:
-        user = session['user']
-        log_action(LOG_TYPES["LOGOUT"], "Вихід з системи", {}, user)
-    
-    session.clear()
-    return redirect(url_for('index'))
-
 @app.route('/dashboard')
-@login_required
 def dashboard():
+    if 'user' not in session:
+        return redirect('/')
+    
     user = session.get('user')
     agency = session.get('agency')
     cases = CASES_DATABASE.get(agency, [])
@@ -254,12 +164,9 @@ def dashboard():
                          cases=cases,
                          total_cases=total_cases,
                          active_cases=active_cases,
-                         critical_cases=critical_cases,
-                         get_status_text=get_status_text,
-                         get_agency_data=get_agency_data)
+                         critical_cases=critical_cases)
 
 @app.route('/add_case', methods=['POST'])
-@login_required
 def add_case():
     data = request.get_json()
     user = session.get('user')
@@ -281,125 +188,20 @@ def add_case():
     
     CASES_DATABASE[agency].append(new_case)
     
-    log_action(LOG_TYPES["CREATE_CASE"], "Створення нової справи", {
-        "caseNumber": new_case["number"],
-        "caseTitle": new_case["title"],
-        "category": new_case["category"],
-        "priority": new_case["priority"]
-    }, user)
-    
     return jsonify({"success": True, "message": f"Справа '{new_case['title']}' успішно створена!"})
 
-@app.route('/view_case/<int:case_id>')
-@login_required
-def view_case(case_id):
+@app.route('/get_cases')
+def get_cases():
     agency = session.get('agency')
-    user = session.get('user')
-    
-    case_item = next((c for c in CASES_DATABASE[agency] if c["id"] == case_id), None)
-    
-    if case_item:
-        log_action(LOG_TYPES["VIEW_CASE"], "Перегляд справи", {
-            "caseNumber": case_item["number"],
-            "caseTitle": case_item["title"]
-        }, user)
-        
-        return jsonify({"success": True, "case": case_item})
-    
-    return jsonify({"success": False, "message": "Справу не знайдено!"})
+    cases = CASES_DATABASE.get(agency, [])
+    return jsonify({"success": True, "cases": cases})
 
-@app.route('/delete_case', methods=['POST'])
-@login_required
-def delete_case():
-    data = request.get_json()
-    case_id = data.get('case_id')
-    prosecutor_username = data.get('prosecutor_username')
-    prosecutor_password = data.get('prosecutor_password')
-    
-    agency = session.get('agency')
-    user = session.get('user')
-    
-    if agency != "prosecutor":
-        return jsonify({"success": False, "message": "Помилка доступу! Тільки прокуратура може видаляти справи."})
-    
-    # Проверка прокурора
-    prosecutor = None
-    for u in USERS["prosecutor"]:
-        if u["username"] == prosecutor_username and u["password"] == prosecutor_password:
-            prosecutor = u
-            break
-    
-    if not prosecutor:
-        return jsonify({"success": False, "message": "Невірний логін або пароль прокурора!"})
-    
-    # Удаление дела
-    case_item = next((c for c in CASES_DATABASE[agency] if c["id"] == case_id), None)
-    if case_item:
-        CASES_DATABASE[agency] = [c for c in CASES_DATABASE[agency] if c["id"] != case_id]
-        
-        log_action(LOG_TYPES["DELETE_CASE"], "Видалення справи", {
-            "caseNumber": case_item["number"],
-            "caseTitle": case_item["title"],
-            "confirmedBy": prosecutor["name"]
-        }, user)
-        
-        return jsonify({"success": True, "message": f"Справу '{case_item['title']}' успішно видалено!"})
-    
-    return jsonify({"success": False, "message": "Справу не знайдено!"})
-
-@app.route('/admin/logs')
-@login_required
-def admin_logs():
-    if session.get('agency') != 'admin':
-        return redirect(url_for('dashboard'))
-    
-    logs = SYSTEM_LOGS["logs"]
-    
-    # Фильтрация
-    log_type = request.args.get('type', '')
-    username = request.args.get('user', '')
-    agency_filter = request.args.get('agency', '')
-    
-    filtered_logs = logs
-    if log_type:
-        filtered_logs = [log for log in filtered_logs if log['type'] == log_type]
-    if username:
-        filtered_logs = [log for log in filtered_logs if log['username'] == username]
-    if agency_filter:
-        filtered_logs = [log for log in filtered_logs if log['agency'] == agency_filter]
-    
-    # Уникальные пользователи для фильтра
-    unique_users = list(set(log['username'] for log in logs))
-    
-    return render_template('admin_logs.html', 
-                         logs=filtered_logs,
-                         unique_users=unique_users,
-                         LOG_TYPES=LOG_TYPES)
-
-@app.route('/admin/export_logs')
-@login_required
-def export_logs():
-    if session.get('agency') != 'admin':
-        return jsonify({"success": False, "message": "Доступ заборонено!"})
-    
-    # Здесь можно реализовать экспорт в CSV
-    # Пока просто возвращаем JSON
-    return jsonify({
-        "success": True,
-        "logs": SYSTEM_LOGS["logs"],
-        "message": "Логи готові для експорту"
-    })
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/')
 
 if __name__ == '__main__':
     initialize_test_data()
-    
-    # Системный лог при запуске
-    log_action(LOG_TYPES["SYSTEM"], "Система запущена", {
-        "version": "2.4.1",
-        "timestamp": datetime.datetime.now().isoformat()
-    })
-    
     print("🛡️ ЄРДР PRO System Initialized")
-    print("24 unique passwords + logging system loaded")
-    
     app.run(debug=True, host='0.0.0.0', port=5000)

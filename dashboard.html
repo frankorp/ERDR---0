@@ -1,1 +1,360 @@
+{% extends "base.html" %}
 
+{% block title %}Панель управління - {{ get_agency_data(agency).name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="dashboard-header">
+        <div class="user-info">
+            <div>
+                <h1>{{ get_agency_data(agency).name }} - Панель управління</h1>
+                <p>Користувач: {{ user.name }} ({{ user.position }})</p>
+            </div>
+            <div>
+                <button class="btn btn-danger" onclick="logout()">Вийти</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-number">{{ total_cases }}</div>
+            <div>Всього справ</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ active_cases }}</div>
+            <div>Активних справ</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ critical_cases }}</div>
+            <div>Критичних справ</div>
+        </div>
+        {% if agency == 'admin' %}
+        <div class="stat-card">
+            <div class="stat-number">{{ SYSTEM_LOGS.logs|length }}</div>
+            <div>Системних логів</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2>Список справ</h2>
+        <button class="btn btn-success" onclick="showAddCaseModal()">➕ Додати справу</button>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Номер справи</th>
+                <th>Назва</th>
+                <th>Статус</th>
+                <th>Дата створення</th>
+                <th>Відповідальний</th>
+                <th>Дії</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for case in cases %}
+            <tr>
+                <td>{{ case.number }}</td>
+                <td>{{ case.title }}</td>
+                <td>
+                    <span class="badge 
+                        {% if case.status == 'new' %}badge-primary
+                        {% elif case.status == 'in-progress' %}badge-warning
+                        {% elif case.status == 'completed' %}badge-success
+                        {% else %}badge-danger{% endif %}">
+                        {{ get_status_text(case.status) }}
+                    </span>
+                </td>
+                <td>{{ case.createdDate }}</td>
+                <td>{{ case.responsible }}</td>
+                <td>
+                    <button class="btn btn-primary" onclick="viewCase({{ case.id }})">👁️ Перегляд</button>
+                    {% if agency == 'prosecutor' %}
+                    <button class="btn btn-danger" onclick="requestCaseDeletion({{ case.id }})">🗑️ Видалити</button>
+                    {% else %}
+                    <button class="btn" disabled title="Тільки прокуратура може видаляти справи">🗑️ Видалити</button>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if agency == 'admin' %}
+    <div style="margin-top: 40px;">
+        <h2>Адміністративна панель</h2>
+        <div class="filters">
+            <div class="filter-group">
+                <label>Тип логу:</label>
+                <select onchange="filterLogs('type', this.value)">
+                    <option value="">Всі типи</option>
+                    <option value="login">Вхід</option>
+                    <option value="logout">Вихід</option>
+                    <option value="create">Створення</option>
+                    <option value="delete">Видалення</option>
+                    <option value="view">Перегляд</option>
+                    <option value="system">Система</option>
+                </select>
+            </div>
+            <button class="btn btn-warning" onclick="exportAllLogs()">📊 Експорт логів</button>
+        </div>
+        
+        <div id="logs-container">
+            {% for log in SYSTEM_LOGS.logs[:50] %}
+            <div class="log-item log-type-{{ log.type }}">
+                <div class="log-info">
+                    <div><strong>{{ log.action }}</strong></div>
+                    <div>{{ log.details|tojson }}</div>
+                    <div>
+                        👤 {{ log.user }} | 
+                        🏢 {{ log.agency }} | 
+                        🌐 {{ log.ip }} | 
+                        🕒 {{ log.timestamp }}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Модальное окно добавления дела -->
+<div class="modal" id="addCaseModal">
+    <div class="modal-content">
+        <h2>Додати нову справу</h2>
+        
+        <div class="form-group">
+            <label for="caseNumber">Номер справи:</label>
+            <input type="text" id="caseNumber" class="form-control" placeholder="Наприклад: 210/2024">
+        </div>
+        
+        <div class="form-group">
+            <label for="caseTitle">Назва справи:</label>
+            <input type="text" id="caseTitle" class="form-control" placeholder="Коротка назва справи">
+        </div>
+        
+        <div class="form-group">
+            <label for="caseDescription">Опис:</label>
+            <textarea id="caseDescription" class="form-control" rows="3" placeholder="Детальний опис справи"></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="caseCategory">Категорія:</label>
+            <select id="caseCategory" class="form-control">
+                <option value="criminal">Кримінальна</option>
+                <option value="operational">Оперативна</option>
+                <option value="supervision">Нагляд</option>
+                <option value="administrative">Адміністративна</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="casePriority">Пріоритет:</label>
+            <select id="casePriority" class="form-control">
+                <option value="low">Низький</option>
+                <option value="medium" selected>Середній</option>
+                <option value="high">Високий</option>
+                <option value="critical">Критичний</option>
+            </select>
+        </div>
+        
+        <button class="btn btn-success" onclick="addNewCase()" style="width: 100%; margin-bottom: 10px;">Створити справу</button>
+        <button class="btn" onclick="closeAddCaseModal()" style="width: 100%; background: var(--gray);">Скасувати</button>
+    </div>
+</div>
+
+<!-- Модальное окно подтверждения удаления (для прокуратуры) -->
+<div class="modal" id="prosecutorConfirmModal">
+    <div class="modal-content">
+        <h2>Підтвердження видалення справи</h2>
+        <div id="caseToDeleteInfo"></div>
+        
+        <div class="form-group">
+            <label for="prosecutorUsername">Логін прокурора:</label>
+            <input type="text" id="prosecutorUsername" class="form-control">
+        </div>
+        
+        <div class="form-group">
+            <label for="prosecutorPassword">Пароль прокурора:</label>
+            <div class="password-wrapper">
+                <input type="password" id="prosecutorPassword" class="form-control">
+                <button type="button" class="password-toggle" onclick="toggleProsecutorPassword()">👁️</button>
+            </div>
+        </div>
+        
+        <button class="btn btn-danger" onclick="confirmCaseDeletion()" style="width: 100%; margin-bottom: 10px;">Підтвердити видалення</button>
+        <button class="btn" onclick="closeProsecutorConfirmModal()" style="width: 100%; background: var(--gray);">Скасувати</button>
+    </div>
+</div>
+
+<script>
+let caseToDelete = null;
+
+function showAddCaseModal() {
+    document.getElementById('addCaseModal').style.display = 'flex';
+}
+
+function closeAddCaseModal() {
+    document.getElementById('addCaseModal').style.display = 'none';
+}
+
+function addNewCase() {
+    const caseData = {
+        number: document.getElementById('caseNumber').value,
+        title: document.getElementById('caseTitle').value,
+        description: document.getElementById('caseDescription').value,
+        category: document.getElementById('caseCategory').value,
+        priority: document.getElementById('casePriority').value
+    };
+    
+    if (!caseData.number || !caseData.title) {
+        showNotification('Будь ласка, заповніть обов\'язкові поля!', 'error');
+        return;
+    }
+    
+    fetch('/add_case', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(caseData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification(data.message, 'success');
+            closeAddCaseModal();
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        } else {
+            showNotification(data.message, 'error');
+        }
+    });
+}
+
+function viewCase(caseId) {
+    fetch(`/view_case/${caseId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const caseItem = data.case;
+                alert(`Перегляд справи:\n\nНомер: ${caseItem.number}\nНазва: ${caseItem.title}\nОпис: ${caseItem.description}\nСтатус: ${caseItem.status}\nПріоритет: ${caseItem.priority}\nВідповідальний: ${caseItem.responsible}`);
+            } else {
+                showNotification(data.message, 'error');
+            }
+        });
+}
+
+function requestCaseDeletion(caseId) {
+    caseToDelete = caseId;
+    
+    // Здесь можно добавить получение информации о деле
+    document.getElementById('caseToDeleteInfo').innerHTML = `
+        <p>Ви дійсно бажаєте видалити справу ID: ${caseId}?</p>
+        <p><strong>Цю дію неможливо скасувати!</strong></p>
+    `;
+    
+    document.getElementById('prosecutorUsername').value = '';
+    document.getElementById('prosecutorPassword').value = '';
+    document.getElementById('prosecutorConfirmModal').style.display = 'flex';
+}
+
+function closeProsecutorConfirmModal() {
+    document.getElementById('prosecutorConfirmModal').style.display = 'none';
+    caseToDelete = null;
+}
+
+function confirmCaseDeletion() {
+    const username = document.getElementById('prosecutorUsername').value;
+    const password = document.getElementById('prosecutorPassword').value;
+    
+    if (!username || !password) {
+        showNotification('Будь ласка, введіть логін та пароль!', 'error');
+        return;
+    }
+    
+    fetch('/delete_case', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            case_id: caseToDelete,
+            prosecutor_username: username,
+            prosecutor_password: password
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification(data.message, 'success');
+            closeProsecutorConfirmModal();
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        } else {
+            showNotification(data.message, 'error');
+        }
+    });
+}
+
+function toggleProsecutorPassword() {
+    const passwordInput = document.getElementById('prosecutorPassword');
+    const toggleButtons = document.querySelectorAll('.password-toggle');
+    const toggleButton = toggleButtons[toggleButtons.length - 1];
+    
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        toggleButton.textContent = '🔒';
+    } else {
+        passwordInput.type = 'password';
+        toggleButton.textContent = '👁️';
+    }
+}
+
+function logout() {
+    window.location.href = '/logout';
+}
+
+function filterLogs(filterType, value) {
+    // Реализация фильтрации логов
+    console.log(`Filter: ${filterType} = ${value}`);
+}
+
+function exportAllLogs() {
+    fetch('/admin/export_logs')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('Логи готові для експорту', 'success');
+                // Здесь можно добавить скачивание файла
+            }
+        });
+}
+
+// Обработчики модальных окон
+window.onclick = function(event) {
+    const modals = ['addCaseModal', 'prosecutorConfirmModal'];
+    modals.forEach(modalId => {
+        const modal = document.getElementById(modalId);
+        if (event.target === modal) {
+            if (modalId === 'addCaseModal') closeAddCaseModal();
+            if (modalId === 'prosecutorConfirmModal') closeProsecutorConfirmModal();
+        }
+    });
+}
+
+// Enter для форм
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        if (document.getElementById('addCaseModal').style.display === 'flex') {
+            addNewCase();
+        }
+    }
+});
+</script>
+{% endblock %}
